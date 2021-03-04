@@ -70,7 +70,7 @@ extern uint32_t PAGE_TABLE_LATENCY, SWAP_LATENCY;
 #define L2C_LATENCY 8  // 4 (L1I or L1D) + 8 = 12 cycles
 
 // LAST LEVEL CACHE
-#define LLC_SET NUM_CPUS*2048
+#define LLC_SET NUM_CPUS*SETS_PER_CPU
 #define LLC_WAY 16
 #define LLC_RQ_SIZE NUM_CPUS*L2C_MSHR_SIZE //48
 #define LLC_WQ_SIZE NUM_CPUS*L2C_MSHR_SIZE //48
@@ -192,6 +192,7 @@ class CACHE : public MEMORY {
          fill_cache(uint32_t set, uint32_t way, PACKET *packet),
          replacement_final_stats(),
          llc_replacement_final_stats(),
+         llc_replacement_heartbeat_stats(),
          //prefetcher_initialize(),
          l1d_prefetcher_initialize(),
          l2c_prefetcher_initialize(),

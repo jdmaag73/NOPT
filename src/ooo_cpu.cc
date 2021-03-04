@@ -1,5 +1,6 @@
 #include "ooo_cpu.h"
 #include "set.h"
+#include "popen_noshell.h"
 
 // out-of-order core
 O3_CPU ooo_cpu[NUM_CPUS]; 
@@ -32,8 +33,8 @@ void O3_CPU::handle_branch()
                 cout << "*** Reached end of trace for Core: " << cpu << " Repeating trace: " << trace_string << endl; 
 
                 // close the trace file and re-open it
-                pclose(trace_file);
-                trace_file = popen(gunzip_command, "r");
+                pclose_noshell(&pass_to_pclose);
+                trace_file = popen_noshell_compat(gunzip_command, "r", &pass_to_pclose);
                 if (trace_file == NULL) {
                     cerr << endl << "*** CANNOT REOPEN TRACE FILE: " << trace_string << " ***" << endl;
                     assert(0);
@@ -161,9 +162,12 @@ void O3_CPU::handle_branch()
                 cout << "*** Reached end of trace for Core: " << cpu << " Repeating trace: " << trace_string << endl; 
 
                 // close the trace file and re-open it
-                pclose(trace_file);
-                trace_file = popen(gunzip_command, "r");
+                if (pclose_noshell(&pass_to_pclose) == -1) {
+			perror("pclose_noshell returns -1");
+		}
+                trace_file = popen_noshell_compat(gunzip_command, "r", &pass_to_pclose);
                 if (trace_file == NULL) {
+		    perror("popen_noshell_compat returned NULL");
                     cerr << endl << "*** CANNOT REOPEN TRACE FILE: " << trace_string << " ***" << endl;
                     assert(0);
                 }

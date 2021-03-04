@@ -5,6 +5,7 @@ L1D_PREFETCHER=$2   # prefetcher/*.l1d_pref
 L2C_PREFETCHER=$3   # prefetcher/*.l2c_pref
 LLC_REPLACEMENT=$4  # replacement/*.llc_repl
 NUM_CORE=$5         # tested up to 8-core system
+CRC2_CONF=$6
 
 ############## Some useful macros ###############
 BOLD=$(tput bold)
@@ -51,12 +52,28 @@ fi
 # Check for multi-core
 if [ "$NUM_CORE" != "1" ]
 then
-    echo "${BOLD}Building multi-core ChampSim...${NORMAL}"
-    sed -i.bak 's/\<NUM_CPUS 1\>/NUM_CPUS '${NUM_CORE}'/g' inc/champsim.h
+    if [ "$NUM_CORE" != "8" ]
+    then
+        echo "${BOLD}Building multi-core ChampSim...${NORMAL}"
+        sed -i.bak 's/\<NUM_CPUS 1\>/NUM_CPUS '${NUM_CORE}'/g' inc/champsim.h
 	sed -i.bak 's/\<DRAM_CHANNELS 1\>/DRAM_CHANNELS 2/g' inc/champsim.h
-	sed -i.bak 's/\<DRAM_CHANNELS_LOG2 0\>/DRAM_CHANNELS_LOG2 1/g' inc/champsim.h
+	sed -i.bak 's/\<LOG2_DRAM_CHANNELS 0\>/LOG2_DRAM_CHANNELS 1/g' inc/champsim.h
+    else
+        echo "${BOLD}Building 8-core ChampSim...${NORMAL}"
+        sed -i.bak 's/\<NUM_CPUS 1\>/NUM_CPUS '${NUM_CORE}'/g' inc/champsim.h
+        sed -i.bak 's/\<DRAM_CHANNELS 1\>/DRAM_CHANNELS 4/g' inc/champsim.h
+        sed -i.bak 's/\<LOG2_DRAM_CHANNELS 0\>/LOG2_DRAM_CHANNELS 2/g' inc/champsim.h
+    fi
 else
     echo "${BOLD}Building single-core ChampSim...${NORMAL}"
+fi
+echo
+
+# Check for crc2 config
+if [ ! -z "$CRC2_CONF" ]
+then
+    echo "${BOLD}CRC2 config ${CRC2_CONF}...${NORMAL}"
+    sed -i.bak 's/\<CRC2_CONFIG 1\>/CRC2_CONFIG '${CRC2_CONF}'/g' inc/champsim.h
 fi
 echo
 
@@ -70,32 +87,54 @@ cp replacement/${LLC_REPLACEMENT}.llc_repl replacement/llc_replacement.cc
 mkdir -p bin
 rm -f bin/champsim
 make clean
-make
+
+if [ -z "$CRC2_CONF" ]
+then
+	make
+else
+	make lib
+fi
 
 # Sanity check
 echo ""
-if [ ! -f bin/champsim ]; then
-    echo "${BOLD}ChampSim build FAILED!${NORMAL}"
-    echo ""
-    exit
+if [ -z "$CRC2_CONF" ]
+then
+	if [ ! -f bin/champsim ]; then
+		echo "${BOLD}ChampSim build FAILED!${NORMAL}"
+		echo ""
+	else
+		echo "${BOLD}ChampSim is successfully built"
+		echo "Branch Predictor: ${BRANCH}"
+		echo "L1D Prefetcher: ${L1D_PREFETCHER}"
+		echo "L2C Prefetcher: ${L2C_PREFETCHER}"
+		echo "LLC Replacement: ${LLC_REPLACEMENT}"
+		echo "Cores: ${NUM_CORE}"
+		BINARY_NAME="${BRANCH}-${L1D_PREFETCHER}-${L2C_PREFETCHER}-${LLC_REPLACEMENT}-${NUM_CORE}core"
+		echo "Binary: bin/${BINARY_NAME}${NORMAL}"
+		echo ""
+		mv bin/champsim bin/${BINARY_NAME}
+	fi
+else
+	if [ ! -f bin/champsim.a ]; then
+		echo "${BOLD}ChampSim build FAILED!${NORMAL}"
+		echo ""
+	else
+		echo "${BOLD}ChampSim is successfully built"
+		echo ""
+	fi
 fi
-
-echo "${BOLD}ChampSim is successfully built"
-echo "Branch Predictor: ${BRANCH}"
-echo "L1D Prefetcher: ${L1D_PREFETCHER}"
-echo "L2C Prefetcher: ${L2C_PREFETCHER}"
-echo "LLC Replacement: ${LLC_REPLACEMENT}"
-echo "Cores: ${NUM_CORE}"
-BINARY_NAME="${BRANCH}-${L1D_PREFETCHER}-${L2C_PREFETCHER}-${LLC_REPLACEMENT}-${NUM_CORE}core"
-echo "Binary: bin/${BINARY_NAME}${NORMAL}"
-echo ""
-mv bin/champsim bin/${BINARY_NAME}
-
 
 # Restore to the default configuration
 sed -i.bak 's/\<NUM_CPUS '${NUM_CORE}'\>/NUM_CPUS 1/g' inc/champsim.h
 sed -i.bak 's/\<DRAM_CHANNELS 2\>/DRAM_CHANNELS 1/g' inc/champsim.h
-sed -i.bak 's/\<DRAM_CHANNELS_LOG2 1\>/DRAM_CHANNELS_LOG2 0/g' inc/champsim.h
+sed -i.bak 's/\<DRAM_CHANNELS 4\>/DRAM_CHANNELS 1/g' inc/champsim.h
+sed -i.bak 's/\<LOG2_DRAM_CHANNELS 1\>/LOG2_DRAM_CHANNELS 0/g' inc/champsim.h
+sed -i.bak 's/\<LOG2_DRAM_CHANNELS 2\>/LOG2_DRAM_CHANNELS 0/g' inc/champsim.h
+
+if [ ! -z "$CRC2_CONF" ]
+then
+    sed -i.bak 's/\<CRC2_CONFIG '${CRC2_CONF}'\>/CRC2_CONFIG 1/g' inc/champsim.h
+fi
 
 cp branch/bimodal.bpred branch/branch_predictor.cc
 cp prefetcher/no.l1d_pref prefetcher/l1d_prefetcher.cc

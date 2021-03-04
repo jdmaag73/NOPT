@@ -24,7 +24,8 @@
 #define SANITY_CHECK
 #define LLC_BYPASS
 #define DRC_BYPASS
-#define NO_CRC2_COMPILE
+//#define NO_CRC2_COMPILE
+#define CRC2_COMPILE
 
 #ifdef DEBUG_PRINT
 #define DP(x) x
@@ -34,7 +35,7 @@
 
 // CPU
 #define NUM_CPUS 1
-#define CPU_FREQ 4000
+#define CPU_FREQ 4500
 #define DRAM_IO_FREQ 800
 #define PAGE_SIZE 4096
 #define LOG2_PAGE_SIZE 12
@@ -56,7 +57,7 @@
 
 // DRAM
 #define DRAM_CHANNELS 1      // default: assuming one DIMM per one channel 4GB * 1 => 4GB off-chip memory
-#define LOG2_DRAM_CHANNELS 1
+#define LOG2_DRAM_CHANNELS 0
 #define DRAM_RANKS 8         // 512MB * 8 ranks => 4GB per DIMM
 #define LOG2_DRAM_RANKS 3
 #define DRAM_BANKS 8         // 64MB * 8 banks => 512MB per rank
@@ -70,6 +71,20 @@
 #define DRAM_SIZE (DRAM_CHANNELS*DRAM_RANKS*DRAM_BANKS*DRAM_ROWS*DRAM_ROW_SIZE/1024) 
 #define DRAM_PAGES ((DRAM_SIZE<<10)>>2) 
 //#define DRAM_PAGES 10
+
+// JDM: Replicamos las configuraciones de CRC2
+#define CRC2_CONFIG 1
+#ifdef CRC2_CONFIG
+	#if CRC2_CONFIG == 5
+		#define SETS_PER_CPU 8192
+	#elif CRC2_CONFIG == 6
+		#define SETS_PER_CPU 8192
+	#else
+		#define SETS_PER_CPU 2048
+	#endif
+#else
+#define SETS_PER_CPU 2048
+#endif
 
 using namespace std;
 
@@ -108,6 +123,12 @@ class RANDOM {
 
     RANDOM (uint64_t seed) {
         engine.seed(seed);
+    }
+
+    // JDM: Seed with a string
+    RANDOM (std::string seed_string) {
+	std::seed_seq seed_seq (seed_string.begin(), seed_string.end());
+        engine.seed(seed_seq);
     }
 
     uint64_t draw_rand() {

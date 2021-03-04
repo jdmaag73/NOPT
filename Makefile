@@ -6,9 +6,13 @@ objDir = obj
 binDir = bin
 inc = inc
 
-debug = 1
+debug = 0
 
-CFlags = -Wall -O3 -std=c++11
+ifeq ($(debug),1)
+	CFlags = -Wall -O0 -std=c++11
+else
+	CFlags = -Wall -O3 -std=c++11
+endif
 LDFlags =
 libs =
 libDir =
@@ -17,10 +21,11 @@ libDir =
 #************************ DO NOT EDIT BELOW THIS LINE! ************************
 
 ifeq ($(debug),1)
-	debug=-g
+	debug=-gdwarf-2
 else
 	debug=
 endif
+defines := $(addprefix -D,${DEFINES})
 inc := $(addprefix -I,$(inc))
 libs := $(addprefix -l,$(libs))
 libDir := $(addprefix -L,$(libDir))
@@ -35,7 +40,7 @@ else
 	CFlags += -std=gnu99
 endif
 
-.phony: all clean distclean
+.phony: all clean distclean lib
 
 
 all: $(binDir)/$(app)
@@ -49,8 +54,15 @@ $(objDir)/%.o: %.$(srcExt)
 	@echo "Generating dependencies for $<..."
 	@$(call make-depend,$<,$@,$(subst .o,.d,$@))
 	@echo "Compiling $<..."
-	@$(CC) $(CFlags) $< -o $@
+	@$(CC) $(CFlags) $(defines) $< -o $@
 
+lib: $(binDir)/$(app).a
+
+$(binDir)/$(app).a: buildrepo $(objects)
+	@mkdir -p `dirname $@`
+	@echo "Linkando libreria $@..."
+	$(AR) r $@ $(objects)
+	
 clean:
 	$(RM) -r $(objDir)
 

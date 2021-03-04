@@ -2,6 +2,7 @@
 #define OOO_CPU_H
 
 #include "cache.h"
+#include "popen_noshell.h"
 
 #ifdef CRC2_COMPILE
 #define STAT_PRINTING_PERIOD 1000000
@@ -34,6 +35,7 @@ class O3_CPU {
 
     // trace
     FILE *trace_file;
+    struct popen_noshell_pass_to_pclose pass_to_pclose;
     char trace_string[1024];
     char gunzip_command[1024];
 
@@ -44,7 +46,7 @@ class O3_CPU {
              begin_sim_cycle, begin_sim_instr, 
              last_sim_cycle, last_sim_instr,
              finish_sim_cycle, finish_sim_instr,
-             warmup_instructions, simulation_instructions, instrs_to_read_this_cycle, instrs_to_fetch_this_cycle,
+             warmup_instructions, simulation_instructions, extra_instructions, instrs_to_read_this_cycle, instrs_to_fetch_this_cycle,
              next_print_instruction, num_retired;
     uint32_t inflight_reg_executions, inflight_mem_executions, num_searched;
     uint32_t next_ITLB_fetch;

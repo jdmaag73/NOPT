@@ -3,17 +3,21 @@
 #include <getopt.h>
 #include "ooo_cpu.h"
 #include "uncore.h"
+#include "popen_noshell.h"
 
 uint8_t warmup_complete[NUM_CPUS], 
         simulation_complete[NUM_CPUS], 
+		extra_simulation_complete[NUM_CPUS],
         all_warmup_complete = 0, 
         all_simulation_complete = 0,
+		all_extra_simulation_complete = 0,
         MAX_INSTR_DESTINATIONS = NUM_INSTR_DESTINATIONS,
         knob_cloudsuite = 0,
         knob_low_bandwidth = 0;
 
 uint64_t warmup_instructions     = 1000000,
          simulation_instructions = 10000000,
+		 extra_instructions = 0,
          champsim_seed;
 
 time_t start_time;
@@ -58,9 +62,11 @@ void print_roi_stats(uint32_t cpu, CACHE *cache)
     cout << cache->NAME;
     cout << " WRITEBACK ACCESS: " << setw(10) << cache->roi_access[cpu][3] << "  HIT: " << setw(10) << cache->roi_hit[cpu][3] << "  MISS: " << setw(10) << cache->roi_miss[cpu][3] << endl;
 
+#ifndef CRC2_COMPILE
     cout << cache->NAME;
     cout << " PREFETCH  REQUESTED: " << setw(10) << cache->pf_requested << "  ISSUED: " << setw(10) << cache->pf_issued;
     cout << "  USEFUL: " << setw(10) << cache->pf_useful << "  USELESS: " << setw(10) << cache->pf_useless << endl;
+#endif	
 }
 
 void print_sim_stats(uint32_t cpu, CACHE *cache)
@@ -266,7 +272,15 @@ uint64_t rotr64 (uint64_t n, unsigned int c)
     return (n>>c) | (n<<( (-c)&mask ));
 }
 
+/* JDM: Esto hacia el seed siempre con 0. porque es una variable global.
+ * Lo cual anula todo el resto de historias para un seed aleatorio
 RANDOM champsim_rand(champsim_seed);
+*/
+
+// JDM: Lo declaramos por cpu y luego hacemos el seed con el string de la traza
+// Eso lo hace repetible por traza
+std::vector<RANDOM*> champsim_rand;
+
 uint64_t va_to_pa(uint32_t cpu, uint64_t instr_id, uint64_t va, uint64_t unique_vpage)
 {
 #ifdef SANITY_CHECK
@@ -365,15 +379,15 @@ uint64_t va_to_pa(uint32_t cpu, uint64_t instr_id, uint64_t va, uint64_t unique_
             if (num_adjacent_page > 0)
                 random_ppage = ++previous_ppage;
             else {
-                random_ppage = champsim_rand.draw_rand();
+                random_ppage = champsim_rand[cpu]->draw_rand();
                 fragmented = 1;
             }
 
             // encoding cpu number 
             // this allows ChampSim to run homogeneous multi-programmed workloads without VA => PA aliasing
             // (e.g., cpu0: astar  cpu1: astar  cpu2: astar  cpu3: astar...)
-            //random_ppage &= (~((NUM_CPUS-1)<< (32-LOG2_PAGE_SIZE)));
-            //random_ppage |= (cpu<<(32-LOG2_PAGE_SIZE)); 
+            // random_ppage &= (~((NUM_CPUS-1)<< (32-LOG2_PAGE_SIZE)));
+            // random_ppage |= (cpu<<(32-LOG2_PAGE_SIZE)); 
 
             while (1) { // try to find an empty physical page number
                 ppage_check = inverse_table.find(random_ppage); // check if this page can be allocated 
@@ -385,11 +399,11 @@ uint64_t va_to_pa(uint32_t cpu, uint64_t instr_id, uint64_t va, uint64_t unique_
                         fragmented = 1;
 
                     // try one more time
-                    random_ppage = champsim_rand.draw_rand();
+                    random_ppage = champsim_rand[cpu]->draw_rand();
                     
                     // encoding cpu number 
-                    //random_ppage &= (~((NUM_CPUS-1)<<(32-LOG2_PAGE_SIZE)));
-                    //random_ppage |= (cpu<<(32-LOG2_PAGE_SIZE)); 
+                    // random_ppage &= (~((NUM_CPUS-1)<<(32-LOG2_PAGE_SIZE)));
+                    // random_ppage |= (cpu<<(32-LOG2_PAGE_SIZE)); 
                 }
                 else
                     break;
@@ -407,7 +421,10 @@ uint64_t va_to_pa(uint32_t cpu, uint64_t instr_id, uint64_t va, uint64_t unique_
 
             // try to allocate pages contiguously
             if (fragmented) {
+/* JDM: Deshabilitamos la utilizacion de paginas contiguas de tamano aleatorio
                 num_adjacent_page = 1 << (rand() % 10);
+*/
+				num_adjacent_page = 0;
                 DP ( if (warmup_complete[cpu]) {
                 cout << "Recalculate num_adjacent_page: " << num_adjacent_page << endl; });
             }
@@ -473,12 +490,13 @@ int main(int argc, char** argv)
             {"cloudsuite", no_argument, 0, 'c'},
             {"low_bandwidth",  no_argument, 0, 'b'},
             {"traces",  no_argument, 0, 't'},
+            {"extra_instructions", required_argument, 0, 'e'},
             {0, 0, 0, 0}      
         };
 
         int option_index = 0;
 
-        c = getopt_long_only(argc, argv, "wihsb", long_options, &option_index);
+        c = getopt_long_only(argc, argv, "wihcbte", long_options, &option_index);
 
         // no more option characters
         if (c == -1)
@@ -506,6 +524,9 @@ int main(int argc, char** argv)
             case 't':
                 traces_encountered = 1;
                 break;
+            case 'e':
+                extra_instructions = atol(optarg);
+                break;
             default:
                 abort();
         }
@@ -517,6 +538,7 @@ int main(int argc, char** argv)
     // consequences of knobs
     cout << "Warmup Instructions: " << warmup_instructions << endl;
     cout << "Simulation Instructions: " << simulation_instructions << endl;
+    cout << "Extra Instructions: " << extra_instructions << endl;
     //cout << "Scramble Loads: " << (knob_scramble_loads ? "ture" : "false") << endl;
     cout << "Number of CPUs: " << NUM_CPUS << endl;
     cout << "LLC sets: " << LLC_SET << endl;
@@ -583,7 +605,8 @@ int main(int argc, char** argv)
                 j++;
             }
 
-            ooo_cpu[count_traces].trace_file = popen(ooo_cpu[count_traces].gunzip_command, "r");
+            ooo_cpu[count_traces].trace_file = popen_noshell_compat(ooo_cpu[count_traces].gunzip_command, "r",
+		&(ooo_cpu[count_traces].pass_to_pclose));
             if (ooo_cpu[count_traces].trace_file == NULL) {
                 printf("\n*** Trace file not found: %s ***\n\n", argv[i]);
                 assert(0);
@@ -606,6 +629,30 @@ int main(int argc, char** argv)
     }
     // end trace file setup
 
+	// JDM: When we run the same trace file in all cores, we can specify an offset
+	// of instructions to skip from the beginning of the trace, so that the cores
+	// are not "artificially" generating their accesses at _exactly_ the same time
+	// This makes no sense for cloudsuite traces, do not use!
+	if (getenv("SIMMETRIC_OFFSET") != NULL) {
+		assert(!knob_cloudsuite);
+		unsigned long long offset = std::stoull(getenv("SIMMETRIC_OFFSET"));
+		unsigned long long curr_offset = offset;
+		
+		size_t instr_size = sizeof(input_instr);
+		input_instr dummy_instr;
+		
+		for (int cpu=1; cpu < NUM_CPUS; cpu++) {
+			cout << "CPU " << cpu << " me salto " << curr_offset << " instrucciones" << endl;
+			for (unsigned long long i=0; i<curr_offset; i++) {
+				if (!fread(&dummy_instr, instr_size, 1, ooo_cpu[cpu].trace_file)) {
+					cerr << "Fallo al leer de traza" << endl;
+					assert(0);
+				}
+			}
+			curr_offset += offset;
+		}
+	}
+	
     // TODO: can we initialize these variables from the class constructor?
     srand(seed_number);
     champsim_seed = seed_number;
@@ -614,8 +661,31 @@ int main(int argc, char** argv)
         ooo_cpu[i].cpu = i; 
         ooo_cpu[i].warmup_instructions = warmup_instructions;
         ooo_cpu[i].simulation_instructions = simulation_instructions;
+		ooo_cpu[i].extra_instructions = extra_instructions;
         ooo_cpu[i].begin_sim_cycle = 0; 
         ooo_cpu[i].begin_sim_instr = warmup_instructions;
+
+		// JDM: RNG init with trace file name, exluding the directory
+		// followed by the content of the CPU_FOR_CHAMPSIM_RAND
+		// If it is empty, use the actual CPU
+		string filename = ooo_cpu[i].trace_string;
+		const size_t last_slash_idx = filename.find_last_of("\\/");
+		if (std::string::npos != last_slash_idx)
+		{
+			filename.erase(0, last_slash_idx + 1);
+		}
+		if (NUM_CPUS > 1) {
+			cout << "NUM_CPUS > 1, inicializo champsim_rand con cpu real" << endl;
+			filename = filename + std::to_string(i);
+		} else if (getenv("CPU_FOR_CHAMPSIM_RAND") == NULL) {
+			cout << "CPU_FOR_CHAMPSIM_RAND es NULL, inicializo champsim_rand con cpu real" << endl;
+			filename = filename + std::to_string(i);
+		} else {
+			cout << "CPU_FOR_CHAMPSIM_RAND es " << getenv("CPU_FOR_CHAMPSIM_RAND") << endl;
+			filename = filename + getenv("CPU_FOR_CHAMPSIM_RAND");
+		}
+		cout << "champsim_rand init cpu " << i << " with string " << filename << endl;
+		champsim_rand.push_back(new RANDOM(filename));
 
         // ROB
         ooo_cpu[i].ROB.cpu = i;
@@ -684,6 +754,7 @@ int main(int argc, char** argv)
         warmup_complete[i] = 0;
         //all_warmup_complete = NUM_CPUS;
         simulation_complete[i] = 0;
+		extra_simulation_complete[i] = 0;
         current_core_cycle[i] = 0;
         stall_cycle[i] = 0;
         
@@ -752,6 +823,8 @@ int main(int argc, char** argv)
 
             // heartbeat information
             if (show_heartbeat && (ooo_cpu[i].num_retired >= ooo_cpu[i].next_print_instruction)) {
+		uncore.LLC.llc_replacement_heartbeat_stats();
+
                 float cumulative_ipc;
                 if (warmup_complete[i])
                     cumulative_ipc = (1.0*(ooo_cpu[i].num_retired - ooo_cpu[i].begin_sim_instr)) / (current_core_cycle[i] - ooo_cpu[i].begin_sim_cycle);
@@ -810,7 +883,12 @@ int main(int argc, char** argv)
                 all_simulation_complete++;
             }
 
-            if (all_simulation_complete == NUM_CPUS)
+			// extra simulation complete
+            if ((all_simulation_complete == NUM_CPUS) && (extra_simulation_complete[i] == 0) && (ooo_cpu[i].num_retired >= (ooo_cpu[i].begin_sim_instr + ooo_cpu[i].simulation_instructions + ooo_cpu[i].extra_instructions))) {
+                extra_simulation_complete[i] = 1;
+				all_extra_simulation_complete++;
+			}
+            if (all_extra_simulation_complete == NUM_CPUS)
                 run_simulation = 0;
         }
 
@@ -853,18 +931,20 @@ int main(int argc, char** argv)
         print_roi_stats(i, &ooo_cpu[i].L1D);
         print_roi_stats(i, &ooo_cpu[i].L1I);
         print_roi_stats(i, &ooo_cpu[i].L2C);
+        cout << "Major fault: " << major_fault[i] << " Minor fault: " << minor_fault[i] << endl;
 #endif
         print_roi_stats(i, &uncore.LLC);
-        cout << "Major fault: " << major_fault[i] << " Minor fault: " << minor_fault[i] << endl;
     }
 
+#ifndef CRC2_COMPILE
     for (uint32_t i=0; i<NUM_CPUS; i++) {
         ooo_cpu[i].L1D.l1d_prefetcher_final_stats();
         ooo_cpu[i].L2C.l2c_prefetcher_final_stats();
     }
+#endif
 
-#ifndef CRC2_COMPILE
     uncore.LLC.llc_replacement_final_stats();
+#ifndef CRC2_COMPILE
     print_dram_stats();
 #endif
 
