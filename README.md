@@ -78,3 +78,11 @@ NOPT/policies/noptb-fair_c3n.exe -warmup_instructions ${WARMUP_INSTRUCTIONS} -si
 export SIMULANDO=1
 NOPT/policies/noptb-fair_c3n.exe -warmup_instructions ${WARMUP_INSTRUCTIONS} -simulation_instructions ${SIMULATION_INSTRUCTIONS} ${TRAZAS}
 ```
+
+4-core/8 MB Random policy, mix 0:
+```
+export WARMUP_INSTRUCTIONS=200000000
+export SIMULATION_INSTRUCTIONS=800000000
+export TRAZAS="-traces sjeng_358B.trace.gz calculix_2670B.trace.gz astar_163B.trace.gz sphinx3_2520B.trace.gz"
+NOPT/policies/random_c3n.exe -warmup_instructions ${WARMUP_INSTRUCTIONS} -simulation_instructions ${SIMULATION_INSTRUCTIONS} ${TRAZAS}
+```
