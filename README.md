@@ -18,7 +18,49 @@ The NOPT folder is new, and includes the following folder structure:
 
 # Reproducing the work
 
-The Linux x64 binaries in /NOPT/policies can be directly run to reproduce the results. Files with "8c" in the name simulate an 8-core processor, used in Section 9 of the paper. The rest simulate a 4-core processor.
+The Linux x64 binaries in /NOPT/policies can be directly run to reproduce the results. Files with "8c" in the name simulate an 8-core processor with 16 MB of SLLC, used in Section 9 of the paper. The rest simulate a 4-core processor with 8 MB of SLLC.
+To obtain the required components, clone this repo and download the traces from the above link.
 
-Here are some sample executions for several scenarios. Downloading and uncompressing the traces is a prerequisite. 
+Here are some sample executions for several scenarios. 
 
+4-core/8 MB NOPTb-miss, Iteration 0, using MISSES, mix 0:
+```
+export FICH_OPT_ACCESSES=void
+export FICH_OPT_ACCESSES_SIG=noptb-miss_fall_c3n.sim0.mix-0.OPT_accesses
+export TRACE_INSTRUCTIONS=1000000000
+export WARMUP_INSTRUCTIONS=200000000
+export SIMULATION_INSTRUCTIONS=800000000
+export EXTRA_INSTRUCTIONS=1200000000
+export SIMULANDO=0
+export MIX=0
+export TRAZAS="-traces sjeng_358B.trace.gz calculix_2670B.trace.gz astar_163B.trace.gz sphinx3_2520B.trace.gz"
+NOPT/policies/noptb-miss_fall_c3n.exe -warmup_instructions ${WARMUP_INSTRUCTIONS} -simulation_instructions ${SIMULATION_INSTRUCTIONS} -extra_instructions ${EXTRA_INSTRUCTIONS} ${TRAZAS}
+```
+
+4-core/8 MB NOPTb-miss, Iteration 1 continuing from previous one, mix 0:
+```
+export FICH_OPT_ACCESSES=noptb-miss_fall_c3n.sim0.mix-0.OPT_accesses
+export FICH_OPT_ACCESSES_SIG=noptb-miss_fall_c3n.sim1.mix-0.OPT_accesses
+export TRACE_INSTRUCTIONS=1000000000
+export WARMUP_INSTRUCTIONS=200000000
+export SIMULATION_INSTRUCTIONS=800000000
+export EXTRA_INSTRUCTIONS=1200000000
+export SIMULANDO=1
+export MIX=0
+export TRAZAS="-traces sjeng_358B.trace.gz calculix_2670B.trace.gz astar_163B.trace.gz sphinx3_2520B.trace.gz"
+NOPT/policies/noptb-miss_fall_c3n.exe -warmup_instructions ${WARMUP_INSTRUCTIONS} -simulation_instructions ${SIMULATION_INSTRUCTIONS} -extra_instructions ${EXTRA_INSTRUCTIONS} ${TRAZAS}
+```
+
+8-core/16 MB NOPTb-miss, Iteration 0, using SRRIP, mix 1:
+```
+export FICH_OPT_ACCESSES=void
+export FICH_OPT_ACCESSES_SIG=noptb-miss_8c3n.sim0.mix-0.OPT_accesses
+export TRACE_INSTRUCTIONS=1000000000
+export WARMUP_INSTRUCTIONS=200000000
+export SIMULATION_INSTRUCTIONS=800000000
+export EXTRA_INSTRUCTIONS=1200000000
+export SIMULANDO=0
+export MIX=1
+export TRAZAS="-traces sjeng_358B.trace.gz omnetpp_340B.trace.gz astar_163B.trace.gz perlbench_53B.trace.gz namd_400B.trace.gz calculix_2670B.trace.gz astar_163B.trace.gz lbm_94B.trace.gz"
+NOPT/policies/noptb-miss_8c3n.exe -warmup_instructions ${WARMUP_INSTRUCTIONS} -simulation_instructions ${SIMULATION_INSTRUCTIONS} -extra_instructions ${EXTRA_INSTRUCTIONS} ${TRAZAS}
+```
