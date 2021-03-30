@@ -64,3 +64,17 @@ export MIX=1
 export TRAZAS="-traces sjeng_358B.trace.gz omnetpp_340B.trace.gz astar_163B.trace.gz perlbench_53B.trace.gz namd_400B.trace.gz calculix_2670B.trace.gz astar_163B.trace.gz lbm_94B.trace.gz"
 NOPT/policies/noptb-miss_8c3n.exe -warmup_instructions ${WARMUP_INSTRUCTIONS} -simulation_instructions ${SIMULATION_INSTRUCTIONS} -extra_instructions ${EXTRA_INSTRUCTIONS} ${TRAZAS}
 ```
+
+4-core/8 MB NOPTb-fair, mix 0, phase 1 followed by phase 2:
+```
+export FICH_OPT_ACCESSES=noptb-fair_c3n.sim0.mix-0.OPT_accesses
+export TRACE_INSTRUCTIONS=1000000000
+export WARMUP_INSTRUCTIONS=200000000
+export SIMULATION_INSTRUCTIONS=800000000
+export SIMULANDO=0
+export MIX=0
+export TRAZAS="-traces sjeng_358B.trace.gz calculix_2670B.trace.gz astar_163B.trace.gz sphinx3_2520B.trace.gz"
+NOPT/policies/noptb-fair_c3n.exe -warmup_instructions ${WARMUP_INSTRUCTIONS} -simulation_instructions ${SIMULATION_INSTRUCTIONS} ${TRAZAS}
+export SIMULANDO=1
+NOPT/policies/noptb-fair_c3n.exe -warmup_instructions ${WARMUP_INSTRUCTIONS} -simulation_instructions ${SIMULATION_INSTRUCTIONS} ${TRAZAS}
+```
