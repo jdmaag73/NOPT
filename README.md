@@ -5,16 +5,16 @@
 
 # Repository content
 
-This repository is basically a fork of https://github.com/ChampSim/ChampSim. Some changes have been made to the ChampSim simulator to add features required to conduct the research.
+This repository is basically a fork of https://github.com/ChampSim/ChampSim, at the version that was used during the work. Some changes have been made to the ChampSim simulator to add features required to conduct the research.
 
-The NOPT folder is new, and includes the following folder structure:
+The NOPT folder is new, and includes the following subfolders:
 
 - policies: Stores several Linux x64 binaries that can be directly run to reproduce the mentioned work. It also includes a script (make.sh) to build those binaries starting from the ChampSim libreries and the source code.
 - policies/pseudocode: Pseudo-code for NOPTb-miss.
 - policies/src: Source code for all policies simulated in the work.
 - policies/inc: Header files.
 - policies/lib: Intermediate ChampSim libraries
-- workloads: Composition of the 4-core and 8-core workload set used to perform the evaluations in the paper. The set of traces is the same used for the 2nd Cache Replacement Championship (CRC-2), that can be found from this link. (http://bit.ly/2t2nkUj) 
+- workloads: Composition of the 4-core and 8-core workload set used to perform the evaluations in the paper. The set of traces is the same used for the 2nd Cache Replacement Championship (CRC-2), and can be downloaded from (http://bit.ly/2t2nkUj).
 
 # Reproducing the work
 
@@ -86,3 +86,38 @@ export SIMULATION_INSTRUCTIONS=800000000
 export TRAZAS="-traces sjeng_358B.trace.gz calculix_2670B.trace.gz astar_163B.trace.gz sphinx3_2520B.trace.gz"
 NOPT/policies/random_c3n.exe -warmup_instructions ${WARMUP_INSTRUCTIONS} -simulation_instructions ${SIMULATION_INSTRUCTIONS} ${TRAZAS}
 ```
+
+# Building the binaries from source code
+
+Building the binaries is a two-step process:
+1) Compile ChampSim into static libraries
+2) Compile a policy source code and link with the corresponding ChamSim library to generate the final binary 
+
+The compilation was done using gcc/g++ v4.9.4. Later versions should also work.
+
+**Step 1**
+
+Run the following commands in a shell
+```
+mkdir lib
+. ./build_crc2_libs.sh
+cp -v lib/* NOPT/policies/lib
+```
+Ignore the "iteration 4u invokes undefined behavior" optimization warning that may appear. 
+
+**Step 2**
+
+First, install Boost C++ libraries following the instructions in (https://www.boost.org/). The compilation was done using v1.65.1, later version may also work.
+This work uses boost/algorithm, boost/archive and boost/serialization. Notice that at least the latter needs to be built separately, after the download.
+
+Then, set the BOOST_DIR environment variable to the path where Boost resides. For example:
+```
+export BOOST_DIR=$HOME/lib/boost
+```
+
+Then, run the script that generates all the binaries:
+```
+cd NOPT/policies
+. ./make.sh
+```
+
