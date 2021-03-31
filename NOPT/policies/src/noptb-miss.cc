@@ -4,7 +4,7 @@
 // Javier Diaz, jdmaag@gmail.com 
 // Pablo Ibañez, imarin@unizar.es
 //                                   
-// This software and the methods and concepts it implements are available without charge to anyone for academic, research, experimental or personal use. 
+// This software and the methods and concepts it implements are available without charge to anyone for academic education, academic research, experimental or personal use. 
 // If you wish to distribute or make other use of the software and/or the methods, you may purchase a license to do so from the authors.
 //
 
